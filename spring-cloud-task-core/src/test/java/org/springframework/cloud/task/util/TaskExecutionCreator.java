@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,10 +36,18 @@ public class TaskExecutionCreator {
 	 * @param taskRepository the taskRepository where the taskExecution should be stored.
 	 * @return the taskExecution created.
 	 */
+	public static TaskExecution createAndStoreEmptyTaskExecution(TaskRepository taskRepository) {
+		return taskRepository.createTaskExecution();
+	}
+
+	/**
+	 * Creates a sample TaskExecution and stores it in the taskRepository.
+	 *
+	 * @param taskRepository the taskRepository where the taskExecution should be stored.
+	 * @return the taskExecution created.
+	 */
 	public static TaskExecution createAndStoreTaskExecutionNoParams(TaskRepository taskRepository) {
-		TaskExecution expectedTaskExecution = TestVerifierUtils.createSampleTaskExecutionNoArg();
-		expectedTaskExecution = taskRepository.createTaskExecution(expectedTaskExecution.getTaskName(),
-				expectedTaskExecution.getStartTime(), expectedTaskExecution.getArguments());
+		TaskExecution expectedTaskExecution = taskRepository.createTaskExecution();
 		return expectedTaskExecution;
 	}
 
@@ -55,8 +63,7 @@ public class TaskExecutionCreator {
 		params.add(UUID.randomUUID().toString());
 		params.add(UUID.randomUUID().toString());
 		expectedTaskExecution.setArguments(params);
-		expectedTaskExecution = taskRepository.createTaskExecution(expectedTaskExecution.getTaskName(),
-				expectedTaskExecution.getStartTime(), expectedTaskExecution.getArguments());
+		expectedTaskExecution = taskRepository.createTaskExecution(expectedTaskExecution);
 		return expectedTaskExecution;
 	}
 

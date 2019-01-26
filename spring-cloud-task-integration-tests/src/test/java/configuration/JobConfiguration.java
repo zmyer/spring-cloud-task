@@ -32,7 +32,6 @@ import org.springframework.batch.item.ItemWriter;
 import org.springframework.batch.item.support.ListItemReader;
 import org.springframework.batch.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cloud.task.configuration.EnableTask;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -41,8 +40,10 @@ import org.springframework.context.annotation.Configuration;
  */
 @Configuration
 @EnableBatchProcessing
-@EnableTask
 public class JobConfiguration {
+
+	private static final int DEFAULT_CHUNK_COUNT = 3;
+
 	@Autowired
 	private JobBuilderFactory jobBuilderFactory;
 
@@ -69,12 +70,12 @@ public class JobConfiguration {
 
 	@Bean
 	public Step step2() {
-		return stepBuilderFactory.get("step2").<String, String>chunk(3)
+		return stepBuilderFactory.get("step2").<String, String>chunk(DEFAULT_CHUNK_COUNT)
 				.reader(new ListItemReader<>(Arrays.asList("1", "2", "3", "4", "5", "6")))
 				.processor(new ItemProcessor<String, String>() {
 					@Override
 					public String process(String item) throws Exception {
-						return String.valueOf(Integer.parseInt((String) item) * -1);
+						return String.valueOf(Integer.parseInt(item) * -1);
 					}
 				})
 				.writer(new ItemWriter<String>() {

@@ -31,12 +31,12 @@ public class JobInstanceEvent extends Entity {
 	private String jobName;
 
 	public JobInstanceEvent() {
-
+		super(-1L);
 	}
 
 	public JobInstanceEvent(Long id, String jobName) {
 		super(id);
-		Assert.hasLength(jobName);
+		Assert.hasLength(jobName, "jobName must have length greater than zero.");
 		this.jobName = jobName;
 	}
 

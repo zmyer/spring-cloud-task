@@ -21,6 +21,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Properties;
 import javax.sql.DataSource;
 
 import org.h2.tools.Server;
@@ -34,9 +35,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.cloud.deployer.spi.local.LocalDeployerProperties;
 import org.springframework.cloud.deployer.spi.local.LocalTaskLauncher;
 import org.springframework.cloud.deployer.spi.task.TaskLauncher;
-import org.springframework.cloud.stream.annotation.Bindings;
+import org.springframework.cloud.stream.binder.test.junit.rabbit.RabbitTestSupport;
 import org.springframework.cloud.stream.messaging.Sink;
-import org.springframework.cloud.stream.test.junit.rabbit.RabbitTestSupport;
 import org.springframework.cloud.task.launcher.util.TaskLauncherSinkApplication;
 import org.springframework.cloud.task.repository.TaskExecution;
 import org.springframework.cloud.task.repository.TaskExplorer;
@@ -59,16 +59,17 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(SpringRunner.class)
-@SpringBootTest(classes = {TaskLauncherSinkApplication.class, TaskLauncherSinkTests.TaskLauncherConfiguration.class})
+@SpringBootTest(classes = {TaskLauncherSinkApplication.class, TaskLauncherSinkTests.TaskLauncherConfiguration.class},
+	properties = {"maven.remote-repositories.repo1.url=https://repo.spring.io/libs-milestone"})
 public class TaskLauncherSinkTests {
 
 	private final static int WAIT_INTERVAL = 500;
-	private final static int MAX_WAIT_TIME = 5000;
-	private final static String URL = "maven://io.spring.cloud:"
-			+ "timestamp-task:jar:1.1.0.M1";
+	private final static int MAX_WAIT_TIME = 120000;
+	private final static String URL = "maven://org.springframework.cloud.task.app:"
+			+ "timestamp-task:2.0.0.RELEASE";
 	private final static String DATASOURCE_URL;
 	private final static String DATASOURCE_USER_NAME = "SA";
-	private final static String DATASOURCE_USER_PASSWORD = "";
+	private final static String DATASOURCE_USER_PASSWORD = "''";
 	private final static String DATASOURCE_DRIVER_CLASS_NAME = "org.h2.Driver";
 	private final static String TASK_NAME = "TASK_LAUNCHER_SINK_TEST";
 
@@ -84,7 +85,6 @@ public class TaskLauncherSinkTests {
 	public static RabbitTestSupport rabbitTestSupport = new RabbitTestSupport();
 
 	@Autowired
-	@Bindings(TaskLauncherSink.class)
 	private Sink sink;
 
 	private DataSource dataSource;
@@ -110,20 +110,7 @@ public class TaskLauncherSinkTests {
 		properties.put("spring.cloud.task.initialize.enable", "false");
 
 		JdbcTemplate template = new JdbcTemplate(this.dataSource);
-		template.execute("DROP TABLE IF EXISTS TASK_TASK_BATCH");
-		template.execute("DROP TABLE IF EXISTS TASK_SEQ");
-		template.execute("DROP TABLE IF EXISTS TASK_EXECUTION_PARAMS");
-		template.execute("DROP TABLE IF EXISTS TASK_EXECUTION");
-		template.execute("DROP TABLE IF EXISTS BATCH_STEP_EXECUTION_SEQ");
-		template.execute("DROP TABLE IF EXISTS BATCH_STEP_EXECUTION_CONTEXT");
-		template.execute("DROP TABLE IF EXISTS BATCH_STEP_EXECUTION");
-		template.execute("DROP TABLE IF EXISTS BATCH_JOB_SEQ");
-		template.execute("DROP TABLE IF EXISTS BATCH_JOB_EXECUTION_SEQ");
-		template.execute("DROP TABLE IF EXISTS BATCH_JOB_EXECUTION_PARAMS");
-		template.execute("DROP TABLE IF EXISTS BATCH_JOB_EXECUTION_CONTEXT");
-		template.execute("DROP TABLE IF EXISTS BATCH_JOB_EXECUTION");
-		template.execute("DROP TABLE IF EXISTS BATCH_JOB_INSTANCE");
-
+		template.execute("DROP ALL OBJECTS");
 
 		DataSourceInitializer initializer = new DataSourceInitializer();
 
@@ -140,9 +127,9 @@ public class TaskLauncherSinkTests {
 		launchTask(URL);
 		assertTrue(waitForDBToBePopulated());
 
-		Page<TaskExecution> taskExecutions = taskExplorer.findAll(new PageRequest(0, 10));
-		TaskExecution te = taskExecutions.iterator().next();
+		Page<TaskExecution> taskExecutions = taskExplorer.findAll(PageRequest.of(0, 10));
 		assertEquals("Only one row is expected", 1, taskExecutions.getTotalElements());
+		assertTrue(waitForTaskToComplete());
 		assertEquals("return code should be 0", 0, taskExecutions.iterator().next().getExitCode().intValue());
 	}
 
@@ -169,8 +156,23 @@ public class TaskLauncherSinkTests {
 		return isDbPopulated;
 	}
 
+		private boolean waitForTaskToComplete() throws Exception {
+			boolean istTaskComplete = false;
+			for (int waitTime = 0; waitTime <= MAX_WAIT_TIME; waitTime += WAIT_INTERVAL) {
+				Thread.sleep(WAIT_INTERVAL);
+				TaskExecution taskExecution = taskExplorer.getTaskExecution(1);
+				if (taskExecution.getExitCode() != null) {
+					istTaskComplete = true;
+					break;
+				}
+			}
+			return istTaskComplete;
+		}
+
 	private void launchTask(String artifactURL) {
-		TaskLaunchRequest request = new TaskLaunchRequest(artifactURL, null, this.properties, null);
+
+		TaskLaunchRequest request = new TaskLaunchRequest(artifactURL, null,
+				this.properties, null, null);
 		GenericMessage<TaskLaunchRequest> message = new GenericMessage<>(request);
 		this.sink.input().send(message);
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,29 +15,31 @@
  */
 package org.springframework.cloud.task.batch.configuration;
 
-import java.util.Collection;
-
-import javax.sql.DataSource;
-
 import org.springframework.batch.core.Job;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.task.batch.listener.TaskBatchExecutionListener;
+import org.springframework.cloud.task.configuration.TaskConfigurer;
+import org.springframework.cloud.task.configuration.TaskProperties;
 import org.springframework.cloud.task.repository.TaskExplorer;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.CollectionUtils;
 
 /**
  * Provides auto configuration for the {@link TaskBatchExecutionListener}.
+ *
+ * The spring.cloud.task.batch.listener.enable is deprecated,
+ * spring.cloud.task.batch.listener.enabled should be used.
  *
  * @author Michael Minella
  */
 @Configuration
 @ConditionalOnBean({Job.class})
-@ConditionalOnProperty(name = "spring.cloud.task.batch.listener.enable", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = {"spring.cloud.task.batch.listener.enable", "spring.cloud.task.batch.listener.enabled"}, havingValue = "true", matchIfMissing = true)
 public class TaskBatchAutoConfiguration {
 
 	@Bean
@@ -48,21 +50,29 @@ public class TaskBatchAutoConfiguration {
 
 	@Configuration
 	@ConditionalOnMissingBean(name = "taskBatchExecutionListener")
+	@EnableConfigurationProperties(TaskProperties.class)
 	public static class TaskBatchExecutionListenerAutoconfiguration {
 
-		@Autowired(required = false)
-		private Collection<DataSource> dataSources;
+		@Autowired
+		private ApplicationContext context;
+
+		@Autowired
+		private TaskProperties taskProperties;
 
 		@Bean
 		public TaskBatchExecutionListenerFactoryBean taskBatchExecutionListener(TaskExplorer taskExplorer) {
-			if(!CollectionUtils.isEmpty(dataSources) && dataSources.size() == 1) {
-				return new TaskBatchExecutionListenerFactoryBean(dataSources.iterator().next(), taskExplorer);
+			TaskConfigurer taskConfigurer = null;
+			if(!this.context.getBeansOfType(TaskConfigurer.class).isEmpty()) {
+				taskConfigurer = this.context.getBean(TaskConfigurer.class);
 			}
-			else if(CollectionUtils.isEmpty(dataSources)) {
-				return new TaskBatchExecutionListenerFactoryBean(null, taskExplorer);
+			if(taskConfigurer != null && taskConfigurer.getTaskDataSource() != null) {
+				return new TaskBatchExecutionListenerFactoryBean(
+						taskConfigurer.getTaskDataSource(),
+						taskExplorer, taskProperties.getTablePrefix());
 			}
 			else {
-				throw new IllegalStateException("Expected one datasource and found " + dataSources.size());
+				return new TaskBatchExecutionListenerFactoryBean(null,
+						taskExplorer, taskProperties.getTablePrefix());
 			}
 		}
 	}

@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package org.springframework.cloud.task.batch.partition;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +68,8 @@ import org.springframework.util.StringUtils;
  */
 public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAware, InitializingBean {
 
+	private static final long DEFAULT_POLL_INTERVAL = 10000;
+
 	public static final String SPRING_CLOUD_TASK_JOB_EXECUTION_ID =
 			"spring.cloud.task.job-execution-id";
 
@@ -75,6 +78,9 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 
 	public static final String SPRING_CLOUD_TASK_STEP_NAME =
 			"spring.cloud.task.step-name";
+
+	public static final String SPRING_CLOUD_TASK_PARENT_EXECUTION_ID =
+			"spring.cloud.task.parentExecutionId";
 
 	public static final String SPRING_CLOUD_TASK_NAME = "spring.cloud.task.name";
 
@@ -96,7 +102,7 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 
 	private Log logger = LogFactory.getLog(DeployerPartitionHandler.class);
 
-	private long pollInterval = 10000;
+	private long pollInterval = DEFAULT_POLL_INTERVAL;
 
 	private long timeout = -1;
 
@@ -109,6 +115,8 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 	private String applicationName;
 
 	private CommandLineArgsProvider commandLineArgsProvider;
+
+	private boolean defaultArgsAsEnvironmentVars = false;
 
 	public DeployerPartitionHandler(TaskLauncher taskLauncher,
 			JobExplorer jobExplorer,
@@ -132,6 +140,16 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 	 */
 	public void setEnvironmentVariablesProvider(EnvironmentVariablesProvider environmentVariablesProvider) {
 		this.environmentVariablesProvider = environmentVariablesProvider;
+	}
+
+	/**
+	 * If set to true, the default args that are used internally by Spring Cloud Task and
+	 * Spring Batch are passed as environment variables instead of command line arguments.
+	 *
+	 * @param defaultArgsAsEnvironmentVars defaults to false
+	 */
+	public void setDefaultArgsAsEnvironmentVars(boolean defaultArgsAsEnvironmentVars) {
+		this.defaultArgsAsEnvironmentVars = defaultArgsAsEnvironmentVars;
 	}
 
 	/**
@@ -185,7 +203,7 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 	/**
 	 * Map of deployment properties to be used by the {@link TaskLauncher}
 	 *
-	 * @param deploymentProperties properites to be used by the {@link TaskLauncher}
+	 * @param deploymentProperties properties to be used by the {@link TaskLauncher}
 	 */
 	public void setDeploymentProperties(Map<String, String> deploymentProperties) {
 		this.deploymentProperties = deploymentProperties;
@@ -206,8 +224,10 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 		this.taskExecution = taskExecution;
 
 		if(this.commandLineArgsProvider == null) {
-			this.commandLineArgsProvider =
-					new SimpleCommandLineArgsProvider(this.taskExecution);
+			SimpleCommandLineArgsProvider provider = new
+					SimpleCommandLineArgsProvider(taskExecution);
+			this.commandLineArgsProvider = provider;
+
 		}
 	}
 
@@ -229,7 +249,7 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 		final Set<StepExecution> executed = new HashSet<>(candidates.size());
 
 		if (CollectionUtils.isEmpty(candidates)) {
-			return null;
+			return Collections.emptySet();
 		}
 
 		launchWorkers(candidates, executed);
@@ -259,19 +279,37 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 				this.commandLineArgsProvider
 						.getCommandLineArgs(copyContext));
 
-		arguments.add(formatArgument(SPRING_CLOUD_TASK_JOB_EXECUTION_ID,
-				String.valueOf(workerStepExecution.getJobExecution().getId())));
-		arguments.add(formatArgument(SPRING_CLOUD_TASK_STEP_EXECUTION_ID,
-				String.valueOf(workerStepExecution.getId())));
-		arguments.add(formatArgument(SPRING_CLOUD_TASK_STEP_NAME, this.stepName));
-		arguments.add(formatArgument(SPRING_CLOUD_TASK_NAME, String.format("%s:%s:%s",
-				taskExecution.getTaskName(),
-				workerStepExecution.getJobExecution().getJobInstance().getJobName(),
-				workerStepExecution.getStepName())));
+		if(!this.defaultArgsAsEnvironmentVars) {
+			arguments.add(formatArgument(SPRING_CLOUD_TASK_JOB_EXECUTION_ID,
+					String.valueOf(workerStepExecution.getJobExecution().getId())));
+			arguments.add(formatArgument(SPRING_CLOUD_TASK_STEP_EXECUTION_ID,
+					String.valueOf(workerStepExecution.getId())));
+			arguments.add(formatArgument(SPRING_CLOUD_TASK_STEP_NAME, this.stepName));
+			arguments.add(formatArgument(SPRING_CLOUD_TASK_NAME, String.format("%s_%s_%s",
+					taskExecution.getTaskName(),
+					workerStepExecution.getJobExecution().getJobInstance().getJobName(),
+					workerStepExecution.getStepName())));
+			arguments.add(formatArgument(SPRING_CLOUD_TASK_PARENT_EXECUTION_ID,
+					String.valueOf(taskExecution.getExecutionId())));
+		}
 
 		copyContext = new ExecutionContext(workerStepExecution.getExecutionContext());
 
 		Map<String, String> environmentVariables = this.environmentVariablesProvider.getEnvironmentVariables(copyContext);
+
+		if(this.defaultArgsAsEnvironmentVars) {
+			environmentVariables.put(SPRING_CLOUD_TASK_JOB_EXECUTION_ID,
+					String.valueOf(workerStepExecution.getJobExecution().getId()));
+			environmentVariables.put(SPRING_CLOUD_TASK_STEP_EXECUTION_ID,
+					String.valueOf(workerStepExecution.getId()));
+			environmentVariables.put(SPRING_CLOUD_TASK_STEP_NAME, this.stepName);
+			environmentVariables.put(SPRING_CLOUD_TASK_NAME, String.format("%s_%s_%s",
+					taskExecution.getTaskName(),
+					workerStepExecution.getJobExecution().getJobInstance().getJobName(),
+					workerStepExecution.getStepName()));
+			environmentVariables.put(SPRING_CLOUD_TASK_PARENT_EXECUTION_ID,
+					String.valueOf(taskExecution.getExecutionId()));
+		}
 
 		AppDefinition definition =
 				new AppDefinition(resolveApplicationName(),
@@ -316,7 +354,8 @@ public class DeployerPartitionHandler implements PartitionHandler, EnvironmentAw
 						StepExecution partitionStepExecution =
 								jobExplorer.getStepExecution(masterStepExecution.getJobExecutionId(), curStepExecution.getId());
 
-						if (isComplete(partitionStepExecution.getStatus())) {
+						BatchStatus batchStatus = partitionStepExecution.getStatus();
+						if (batchStatus != null && isComplete(batchStatus)) {
 							result.add(partitionStepExecution);
 							currentWorkers--;
 

@@ -27,7 +27,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.datasource.init.DatabasePopulatorUtils;
 import org.springframework.jdbc.datasource.init.ResourceDatabasePopulator;
+import org.springframework.jdbc.support.JdbcUtils;
 import org.springframework.jdbc.support.MetaDataAccessException;
+import org.springframework.util.StringUtils;
 
 /**
  * Utility for initializing the Task Repository's datasource.  If a single
@@ -62,6 +64,9 @@ public final class TaskRepositoryInitializer implements InitializingBean {
 	@Value("${spring.cloud.task.initialize.enable:true}")
 	private boolean taskInitializationEnable;
 
+	@Value("${spring.cloud.task.tablePrefix:#{null}}")
+	private String tablePrefix;
+
 	public TaskRepositoryInitializer(){
 	}
 
@@ -76,7 +81,7 @@ public final class TaskRepositoryInitializer implements InitializingBean {
 
 	private String getDatabaseType(DataSource dataSource) {
 		try {
-			return DatabaseType.fromMetaData(dataSource).toString().toLowerCase();
+			return JdbcUtils.commonDatabaseName(DatabaseType.fromMetaData(dataSource).toString()).toLowerCase();
 		}
 		catch (MetaDataAccessException ex) {
 			throw new IllegalStateException("Unable to detect database type", ex);
@@ -85,7 +90,9 @@ public final class TaskRepositoryInitializer implements InitializingBean {
 
 	@Override
 	public void afterPropertiesSet() throws Exception {
-		if (dataSource != null && taskInitializationEnable) {
+		if (dataSource != null &&
+				taskInitializationEnable &&
+				!StringUtils.hasText(this.tablePrefix)) {
 			String platform = getDatabaseType(dataSource);
 			if ("hsql".equals(platform)) {
 				platform = "hsqldb";

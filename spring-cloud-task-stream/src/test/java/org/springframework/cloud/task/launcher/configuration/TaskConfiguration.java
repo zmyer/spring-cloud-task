@@ -19,6 +19,7 @@ package org.springframework.cloud.task.launcher.configuration;
 import java.util.List;
 
 import org.springframework.cloud.deployer.spi.core.AppDeploymentRequest;
+import org.springframework.cloud.deployer.spi.core.RuntimeEnvironmentInfo;
 import org.springframework.cloud.deployer.spi.task.LaunchState;
 import org.springframework.cloud.deployer.spi.task.TaskLauncher;
 import org.springframework.cloud.deployer.spi.task.TaskStatus;
@@ -45,10 +46,13 @@ public class TaskConfiguration {
 
 		private List<String> commandlineArguments;
 
+		private String applicationName;
+
 		@Override
 		public String launch(AppDeploymentRequest request) {
 			state = LaunchState.complete;
 			this.commandlineArguments = request.getCommandlineArguments();
+			this.applicationName = request.getDefinition().getName();
 			return null;
 		}
 
@@ -62,8 +66,27 @@ public class TaskConfiguration {
 			return new TaskStatus(LAUNCH_ID, state, null);
 		}
 
+		@Override
+		public void cleanup(String id) {
+			throw new UnsupportedOperationException("Cleanup is not supported");
+		}
+
+		@Override
+		public void destroy(String appName) {
+			throw new UnsupportedOperationException("Destroy is not supported");
+		}
+
+		@Override
+		public RuntimeEnvironmentInfo environmentInfo() {
+			throw new UnsupportedOperationException("environmentInfo is not supported");
+		}
+
 		public List<String> getCommandlineArguments() {
 			return commandlineArguments;
+		}
+
+		public String getApplicationName() {
+			return applicationName;
 		}
 	}
 }

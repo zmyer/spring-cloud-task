@@ -1,6 +1,5 @@
-
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -29,7 +28,8 @@ import org.springframework.context.annotation.Import;
 
 /**
  * <p>
- * Enable Spring Task features.
+ * Enables the {@link org.springframework.cloud.task.listener.TaskLifecycleListener}
+ * so that the features of Spring Cloud Task will be applied.
  *
  * <pre class="code">
  * &#064;Configuration
@@ -45,20 +45,15 @@ import org.springframework.context.annotation.Import;
  *
  * Note that only one of your configuration classes needs to have the <code>&#064;EnableTask</code>
  * annotation. Once you have an <code>&#064;EnableTask</code> class in your configuration
- * you will have an instance of {@link TaskConfigurer}.  If one is not specified then the
- * {@link DefaultTaskConfigurer} will be used.
- * You will also be able to <code>&#064;Autowired</code> some useful stuff into your context:
- *
- * <ul>
- * <li>a {@link TaskRepository} (bean name "taskRepository").
- * </ul>
+ * the task will have the Spring Cloud Task features available.
  *
  * @author Glenn Renfro
+ *
  */
 @Target(ElementType.TYPE)
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 @Inherited
-@Import(SimpleTaskConfiguration.class)
+@Import(TaskLifecycleConfiguration.class)
 public @interface EnableTask {
 }

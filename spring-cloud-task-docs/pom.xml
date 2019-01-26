@@ -4,7 +4,7 @@
 	<parent>
 		<groupId>org.springframework.cloud</groupId>
 		<artifactId>spring-cloud-task-parent</artifactId>
-		<version>1.1.0.BUILD-SNAPSHOT</version>
+		<version>2.1.0.BUILD-SNAPSHOT</version>
 	</parent>
 	<artifactId>spring-cloud-task-docs</artifactId>
 	<name>Spring Cloud Task Docs</name>
@@ -118,7 +118,7 @@
 								<goals>
 									<goal>generate-html</goal>
 								</goals>
-								<phase>generate-resources</phase>
+								<phase>prepare-package</phase>
 								<configuration>
 									<htmlCustomization>${basedir}/src/main/docbook/xsl/html-singlepage.xsl</htmlCustomization>
 									<targetDirectory>${basedir}/target/docbook/htmlsingle</targetDirectory>
@@ -144,7 +144,7 @@
 								<goals>
 									<goal>generate-html</goal>
 								</goals>
-								<phase>generate-resources</phase>
+								<phase>prepare-package</phase>
 								<configuration>
 									<htmlCustomization>${basedir}/src/main/docbook/xsl/html-multipage.xsl</htmlCustomization>
 									<targetDirectory>${basedir}/target/docbook/html</targetDirectory>
@@ -171,7 +171,7 @@
 								<goals>
 									<goal>generate-pdf</goal>
 								</goals>
-								<phase>generate-resources</phase>
+								<phase>prepare-package</phase>
 								<configuration>
 									<foCustomization>${basedir}/src/main/docbook/xsl/pdf.xsl</foCustomization>
 									<targetDirectory>${basedir}/target/docbook/pdf</targetDirectory>
@@ -190,7 +190,7 @@
 								<goals>
 									<goal>generate-epub3</goal>
 								</goals>
-								<phase>generate-resources</phase>
+								<phase>prepare-package</phase>
 								<configuration>
 									<epubCustomization>${basedir}/src/main/docbook/xsl/epub.xsl</epubCustomization>
 									<targetDirectory>${basedir}/target/docbook/epub</targetDirectory>
@@ -269,6 +269,45 @@
 										<var name="github-tag" value="v${project.version}" />
 										<propertyregex property="github-tag" override="true" input="${github-tag}" regexp=".*SNAPSHOT" replace="master" />
 									</target>
+								</configuration>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<artifactId>maven-assembly-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>docs-assembly</id>
+								<phase>package</phase>
+								<configuration>
+									<appendAssemblyId>false</appendAssemblyId>
+									<descriptors>
+										<descriptor>src/main/assembly/assemble.xml</descriptor>
+									</descriptors>
+									<attach>false</attach>
+								</configuration>
+								<goals>
+									<goal>single</goal>
+								</goals>
+							</execution>
+						</executions>
+					</plugin>
+					<plugin>
+						<groupId>org.codehaus.mojo</groupId>
+						<artifactId>build-helper-maven-plugin</artifactId>
+						<executions>
+							<execution>
+								<id>attach-zip</id>
+								<goals>
+									<goal>attach-artifact</goal>
+								</goals>
+								<configuration>
+									<artifacts>
+										<artifact>
+											<file>${project.build.directory}/${project.artifactId}-${project.version}.zip</file>
+											<type>zip;zip.type=docs;zip.deployed=false</type>
+										</artifact>
+									</artifacts>
 								</configuration>
 							</execution>
 						</executions>

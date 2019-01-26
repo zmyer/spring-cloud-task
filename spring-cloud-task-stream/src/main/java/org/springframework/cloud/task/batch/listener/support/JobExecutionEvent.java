@@ -16,8 +16,6 @@
 
 package org.springframework.cloud.task.batch.listener.support;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -57,7 +55,7 @@ public class JobExecutionEvent extends Entity {
 
 	private Date lastUpdated = null;
 
-	private ExitStatus exitStatus = new ExitStatus(new org.springframework.batch.core.ExitStatus("UNKNOWN", null));
+	private ExitStatus exitStatus = new ExitStatus(new org.springframework.batch.core.ExitStatus("UNKNOWN"));
 
 	private ExecutionContext executionContext = new ExecutionContext();
 
@@ -155,14 +153,14 @@ public class JobExecutionEvent extends Entity {
 	}
 
 	/**
-	 * @param exitStatus
+	 * @param exitStatus the exit status for the job.
 	 */
 	public void setExitStatus(ExitStatus exitStatus) {
 		this.exitStatus = exitStatus;
 	}
 
 	/**
-	 * @return the exitCode
+	 * @return the exitCode for the job.
 	 */
 	public ExitStatus getExitStatus() {
 		return this.exitStatus;
@@ -232,9 +230,9 @@ public class JobExecutionEvent extends Entity {
 	}
 
 	/**
-	 * Set the last time this JobExecution was updated.
+	 * Set the last time this {@link JobExecution} was updated.
 	 *
-	 * @param lastUpdated
+	 * @param lastUpdated The date the {@link JobExecution} was updated.
 	 */
 	public void setLastUpdated(Date lastUpdated) {
 		this.lastUpdated = lastUpdated;
@@ -247,7 +245,7 @@ public class JobExecutionEvent extends Entity {
 	/**
 	 * Add the provided throwable to the failure exception list.
 	 *
-	 * @param t
+	 * @param t a {@link Throwable} to be added to the exception list.
 	 */
 	public synchronized void addFailureException(Throwable t) {
 		this.failureExceptions.add(t);
@@ -268,15 +266,6 @@ public class JobExecutionEvent extends Entity {
 		}
 
 		return new ArrayList<>(allExceptions);
-	}
-
-	/**
-	 * Deserialize and ensure transient fields are re-instantiated when read
-	 * back
-	 */
-	private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
-		stream.defaultReadObject();
-		this.failureExceptions = new ArrayList<>();
 	}
 
 	/*

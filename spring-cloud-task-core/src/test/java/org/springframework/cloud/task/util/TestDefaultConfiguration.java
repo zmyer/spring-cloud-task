@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,7 +21,10 @@ import javax.sql.DataSource;
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.cloud.task.configuration.TaskProperties;
 import org.springframework.cloud.task.listener.TaskLifecycleListener;
+import org.springframework.cloud.task.listener.TaskListenerExecutorObjectFactory;
 import org.springframework.cloud.task.repository.TaskExplorer;
 import org.springframework.cloud.task.repository.TaskNameResolver;
 import org.springframework.cloud.task.repository.TaskRepository;
@@ -40,9 +43,13 @@ import org.springframework.context.annotation.Configuration;
  * @author Michael Minella
  */
 @Configuration
+@EnableConfigurationProperties(TaskProperties.class)
 public class TestDefaultConfiguration implements InitializingBean {
 
 	private TaskExecutionDaoFactoryBean factoryBean;
+
+	@Autowired
+	TaskProperties taskProperties;
 
 	@Autowired(required = false)
 	private ApplicationArguments applicationArguments;
@@ -59,7 +66,7 @@ public class TestDefaultConfiguration implements InitializingBean {
 	}
 
 	@Bean
-	public TaskExplorer taskExplorer() throws Exception {
+	public TaskExplorer taskExplorer() {
 		return new SimpleTaskExplorer(this.factoryBean);
 	}
 
@@ -69,8 +76,14 @@ public class TestDefaultConfiguration implements InitializingBean {
 	}
 
 	@Bean
-	public TaskLifecycleListener taskHandler(){
-		return new TaskLifecycleListener(taskRepository(), taskNameResolver(), applicationArguments);
+	public TaskListenerExecutorObjectFactory taskListenerExecutorObjectProvider(ConfigurableApplicationContext context) {
+		return new TaskListenerExecutorObjectFactory(context);
+	}
+
+	@Bean
+	public TaskLifecycleListener taskHandler(TaskExplorer taskExplorer){
+		return new TaskLifecycleListener(taskRepository(), taskNameResolver(),
+				applicationArguments, taskExplorer, taskProperties, taskListenerExecutorObjectProvider(context));
 	}
 
 	@Override

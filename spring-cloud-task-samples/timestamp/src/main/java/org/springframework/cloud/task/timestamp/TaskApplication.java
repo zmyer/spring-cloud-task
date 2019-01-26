@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,8 +35,9 @@ import org.springframework.context.annotation.Bean;
 /**
  * Spring Boot Application that has tasks enabled.
  */
-@SpringBootApplication
+
 @EnableTask
+@SpringBootApplication
 @EnableConfigurationProperties({ TimestampTaskProperties.class })
 public class TaskApplication {
 
@@ -54,7 +55,7 @@ public class TaskApplication {
 	/**
 	 * A commandline runner that prints a timestamp.
 	 */
-	public class TimestampTask implements CommandLineRunner {
+	public static class TimestampTask implements CommandLineRunner {
 
 		@Autowired
 		private TimestampTaskProperties config;

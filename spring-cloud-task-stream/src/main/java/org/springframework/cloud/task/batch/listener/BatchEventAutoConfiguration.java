@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 the original author or authors.
+ * Copyright 2016-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,18 +24,21 @@ import org.springframework.batch.core.JobExecutionListener;
 import org.springframework.batch.core.SkipListener;
 import org.springframework.batch.core.StepExecutionListener;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.annotation.Output;
 import org.springframework.cloud.task.batch.listener.support.TaskBatchEventListenerBeanPostProcessor;
+import org.springframework.cloud.task.batch.listener.support.TaskEventProperties;
+import org.springframework.cloud.task.configuration.SimpleTaskAutoConfiguration;
 import org.springframework.cloud.task.listener.TaskLifecycleListener;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.integration.gateway.GatewayProxyFactoryBean;
 import org.springframework.messaging.MessageChannel;
 
 /**
@@ -53,20 +56,22 @@ import org.springframework.messaging.MessageChannel;
  *
  * @author Michael Minella
  * @author Glenn Renfro
+ * @author Ali Shahbour
  */
 @Configuration
 @ConditionalOnClass(Job.class)
 @ConditionalOnBean(value = { Job.class, TaskLifecycleListener.class })
 @ConditionalOnProperty(prefix = "spring.cloud.task.batch.events", name = "enabled", havingValue = "true", matchIfMissing = true)
+@AutoConfigureAfter(SimpleTaskAutoConfiguration.class)
 public class BatchEventAutoConfiguration {
 
-	public final static String JOB_EXECUTION_EVENTS_LISTENER = "jobExecutionEventsListener";
-	public final static String CHUNK_EVENTS_LISTENER = "chunkEventsListener";
-	public final static String STEP_EXECUTION_EVENTS_LISTENER = "stepExecutionEventsListener";
-	public final static String ITEM_READ_EVENTS_LISTENER = "itemReadEventsListener";
-	public final static String ITEM_WRITE_EVENTS_LISTENER = "itemWriteEventsListener";
-	public final static String ITEM_PROCESS_EVENTS_LISTENER = "itemProcessEventsListener";
-	public final static String SKIP_EVENTS_LISTENER = "skipEventsListener";
+	public static final String JOB_EXECUTION_EVENTS_LISTENER = "jobExecutionEventsListener";
+	public static final String CHUNK_EVENTS_LISTENER = "chunkEventsListener";
+	public static final String STEP_EXECUTION_EVENTS_LISTENER = "stepExecutionEventsListener";
+	public static final String ITEM_READ_EVENTS_LISTENER = "itemReadEventsListener";
+	public static final String ITEM_WRITE_EVENTS_LISTENER = "itemWriteEventsListener";
+	public static final String ITEM_PROCESS_EVENTS_LISTENER = "itemProcessEventsListener";
+	public static final String SKIP_EVENTS_LISTENER = "skipEventsListener";
 
 	@Bean
 	@ConditionalOnMissingBean
@@ -77,59 +82,58 @@ public class BatchEventAutoConfiguration {
 	@Configuration
 	@ConditionalOnClass(EnableBinding.class)
 	@EnableBinding(BatchEventsChannels.class)
+	@EnableConfigurationProperties(TaskEventProperties.class)
 	@ConditionalOnMissingBean(name = JOB_EXECUTION_EVENTS_LISTENER)
 	public static class JobExecutionListenerConfiguration {
 
 		@Autowired
 		private BatchEventsChannels listenerChannels;
 
+		@Autowired
+		private TaskEventProperties taskEventProperties;
+
 		@Bean
 		@Lazy
 		@ConditionalOnProperty(prefix = "spring.cloud.task.batch.events.job-execution", name = "enabled", havingValue = "true", matchIfMissing = true)
 		public JobExecutionListener jobExecutionEventsListener() {
-			return new EventEmittingJobExecutionListener(listenerChannels.jobExecutionEvents());
+			return new EventEmittingJobExecutionListener(listenerChannels.jobExecutionEvents(),taskEventProperties.getJobExecutionOrder());
 		}
 
 		@Bean
 		@ConditionalOnProperty(prefix = "spring.cloud.task.batch.events.step-execution", name = "enabled", havingValue = "true", matchIfMissing = true)
 		public StepExecutionListener stepExecutionEventsListener() {
-			return new EventEmittingStepExecutionListener(listenerChannels.stepExecutionEvents());
+			return new EventEmittingStepExecutionListener(listenerChannels.stepExecutionEvents(),taskEventProperties.getStepExecutionOrder());
 		}
 
 		@Bean
 		@Lazy
 		@ConditionalOnProperty(prefix = "spring.cloud.task.batch.events.chunk", name = "enabled", havingValue = "true", matchIfMissing = true)
-		public GatewayProxyFactoryBean chunkEventsListener() {
-			GatewayProxyFactoryBean factoryBean =
-					new GatewayProxyFactoryBean(ChunkListener.class);
-
-			factoryBean.setDefaultRequestChannel(listenerChannels.chunkEvents());
-
-			return factoryBean;
+		public EventEmittingChunkListener chunkEventsListener() {
+			return new EventEmittingChunkListener(listenerChannels.chunkEvents(),taskEventProperties.getChunkOrder());
 		}
 
 		@Bean
 		@ConditionalOnProperty(prefix = "spring.cloud.task.batch.events.item-read", name = "enabled", havingValue = "true", matchIfMissing = true)
 		public ItemReadListener itemReadEventsListener() {
-			return new EventEmittingItemReadListener(listenerChannels.itemReadEvents());
+			return new EventEmittingItemReadListener(listenerChannels.itemReadEvents(),taskEventProperties.getItemReadOrder());
 		}
 
 		@Bean
 		@ConditionalOnProperty(prefix = "spring.cloud.task.batch.events.item-write", name = "enabled", havingValue = "true", matchIfMissing = true)
 		public ItemWriteListener itemWriteEventsListener() {
-			return new EventEmittingItemWriteListener(listenerChannels.itemWriteEvents());
+			return new EventEmittingItemWriteListener(listenerChannels.itemWriteEvents(),taskEventProperties.getItemWriteOrder());
 		}
 
 		@Bean
 		@ConditionalOnProperty(prefix = "spring.cloud.task.batch.events.item-process", name = "enabled", havingValue = "true", matchIfMissing = true)
 		public ItemProcessListener itemProcessEventsListener() {
-			return new EventEmittingItemProcessListener(listenerChannels.itemProcessEvents());
+			return new EventEmittingItemProcessListener(listenerChannels.itemProcessEvents(),taskEventProperties.getItemProcessOrder());
 		}
 
 		@Bean
 		@ConditionalOnProperty(prefix = "spring.cloud.task.batch.events.skip", name = "enabled", havingValue = "true", matchIfMissing = true)
 		public SkipListener skipEventsListener() {
-			return new EventEmittingSkipListener(listenerChannels.skipEvents());
+			return new EventEmittingSkipListener(listenerChannels.skipEvents(),taskEventProperties.getItemProcessOrder());
 		}
 	}
 

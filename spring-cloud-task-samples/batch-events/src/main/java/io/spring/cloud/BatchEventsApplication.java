@@ -38,8 +38,8 @@ import org.springframework.cloud.task.configuration.EnableTask;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-@SpringBootApplication
 @EnableTask
+@SpringBootApplication
 @EnableBatchProcessing
 public class BatchEventsApplication {
 
@@ -49,6 +49,8 @@ public class BatchEventsApplication {
 
 	@Configuration
 	public static class JobConfiguration {
+
+		private static final int DEFAULT_CHUNK_COUNT = 3;
 
 		@Autowired
 		private JobBuilderFactory jobBuilderFactory;
@@ -71,7 +73,7 @@ public class BatchEventsApplication {
 		@Bean
 		public Step step2() {
 			return this.stepBuilderFactory.get("step2")
-					.<String, String>chunk(3)
+					.<String, String>chunk(DEFAULT_CHUNK_COUNT)
 					.reader(new ListItemReader<>(Arrays.asList("1", "2", "3", "4", "5", "6")))
 					.processor(new ItemProcessor<String, String>() {
 						@Override

@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2016 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 
 package org.springframework.cloud.task.repository.support;
 
+import java.util.Collections;
 import java.util.Date;
 import java.util.UUID;
 
@@ -25,18 +26,17 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.PropertyPlaceholderAutoConfiguration;
+import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.autoconfigure.jdbc.EmbeddedDataSourceConfiguration;
-import org.springframework.cloud.task.configuration.SimpleTaskConfiguration;
+import org.springframework.cloud.task.configuration.SimpleTaskAutoConfiguration;
 import org.springframework.cloud.task.repository.TaskExecution;
-import org.springframework.cloud.task.repository.TaskExplorer;
 import org.springframework.cloud.task.repository.TaskRepository;
 import org.springframework.cloud.task.util.TaskExecutionCreator;
 import org.springframework.cloud.task.util.TestDBUtils;
 import org.springframework.cloud.task.util.TestVerifierUtils;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.junit4.SpringRunner;
 
 import static org.junit.Assert.assertEquals;
 
@@ -45,11 +45,13 @@ import static org.junit.Assert.assertEquals;
  *
  * @author Glenn Renfro.
  * @author Michael Minella
+ * @author Ilayaperumal Gopinathan
  */
-@RunWith(SpringJUnit4ClassRunner.class)
+@RunWith(SpringRunner.class)
 @ContextConfiguration(classes = {EmbeddedDataSourceConfiguration.class,
-		SimpleTaskConfiguration.class,
+		SimpleTaskAutoConfiguration.class,
 		PropertyPlaceholderAutoConfiguration.class})
+@DirtiesContext
 public class SimpleTaskRepositoryJdbcTests {
 
 	@Autowired
@@ -58,8 +60,16 @@ public class SimpleTaskRepositoryJdbcTests {
 	@Autowired
 	private DataSource dataSource;
 
-	@Autowired
-	private TaskExplorer taskExplorer;
+	@Test
+	@DirtiesContext
+	public void testCreateEmptyExecution() {
+		TaskExecution expectedTaskExecution =
+				TaskExecutionCreator.createAndStoreEmptyTaskExecution(taskRepository);
+		TaskExecution actualTaskExecution = TestDBUtils.getTaskExecutionFromDB(dataSource,
+				expectedTaskExecution.getExecutionId());
+		TestVerifierUtils.verifyTaskExecution(expectedTaskExecution,
+				actualTaskExecution);
+	}
 
 	@Test
 	@DirtiesContext
@@ -83,6 +93,94 @@ public class SimpleTaskRepositoryJdbcTests {
 
 	@Test
 	@DirtiesContext
+	public void startTaskExecutionWithParam() {
+		TaskExecution expectedTaskExecution =
+				TaskExecutionCreator.createAndStoreEmptyTaskExecution(taskRepository);
+
+		expectedTaskExecution.setArguments(Collections.singletonList("foo=" + UUID.randomUUID().toString()));
+		expectedTaskExecution.setStartTime(new Date());
+		expectedTaskExecution.setTaskName(UUID.randomUUID().toString());
+
+		TaskExecution actualTaskExecution = this.taskRepository.startTaskExecution(expectedTaskExecution.getExecutionId(),
+				expectedTaskExecution.getTaskName(), expectedTaskExecution.getStartTime(),
+				expectedTaskExecution.getArguments(), expectedTaskExecution.getExternalExecutionId());
+
+		TestVerifierUtils.verifyTaskExecution(expectedTaskExecution, actualTaskExecution);
+	}
+
+	@Test
+	@DirtiesContext
+	public void startTaskExecutionWithNoParam() {
+		TaskExecution expectedTaskExecution =
+				TaskExecutionCreator.createAndStoreEmptyTaskExecution(taskRepository);
+
+		expectedTaskExecution.setStartTime(new Date());
+		expectedTaskExecution.setTaskName(UUID.randomUUID().toString());
+
+		TaskExecution actualTaskExecution = this.taskRepository.startTaskExecution(expectedTaskExecution.getExecutionId(),
+				expectedTaskExecution.getTaskName(), expectedTaskExecution.getStartTime(),
+				expectedTaskExecution.getArguments(), expectedTaskExecution.getExternalExecutionId());
+
+		TestVerifierUtils.verifyTaskExecution(expectedTaskExecution, actualTaskExecution);
+	}
+
+	@Test
+	public void testUpdateExternalExecutionId() {
+		TaskExecution expectedTaskExecution =
+				TaskExecutionCreator.createAndStoreTaskExecutionNoParams(taskRepository);
+		expectedTaskExecution.setExternalExecutionId(UUID.randomUUID().toString());
+		taskRepository.updateExternalExecutionId(
+				expectedTaskExecution.getExecutionId(),
+				expectedTaskExecution.getExternalExecutionId());
+		TestVerifierUtils.verifyTaskExecution(expectedTaskExecution,
+				TestDBUtils.getTaskExecutionFromDB(dataSource,
+						expectedTaskExecution.getExecutionId()));
+	}
+
+	@Test
+	public void testUpdateNullExternalExecutionId() {
+		TaskExecution expectedTaskExecution =
+				TaskExecutionCreator.createAndStoreTaskExecutionNoParams(taskRepository);
+		expectedTaskExecution.setExternalExecutionId(null);
+		taskRepository.updateExternalExecutionId(
+				expectedTaskExecution.getExecutionId(),
+				expectedTaskExecution.getExternalExecutionId());
+		TestVerifierUtils.verifyTaskExecution(expectedTaskExecution,
+				TestDBUtils.getTaskExecutionFromDB(dataSource,
+						expectedTaskExecution.getExecutionId()));
+	}
+
+	@Test(expected = IllegalStateException.class)
+	public void testInvalidExecutionIdForExternalExecutionIdUpdate() {
+		TaskExecution expectedTaskExecution =
+				TaskExecutionCreator.createAndStoreTaskExecutionNoParams(taskRepository);
+		expectedTaskExecution.setExternalExecutionId(null);
+		taskRepository.updateExternalExecutionId(
+				-1,
+				expectedTaskExecution.getExternalExecutionId());
+	}
+
+	@Test
+	@DirtiesContext
+	public void startTaskExecutionWithParent() {
+		TaskExecution expectedTaskExecution =
+				TaskExecutionCreator.createAndStoreEmptyTaskExecution(taskRepository);
+
+		expectedTaskExecution.setStartTime(new Date());
+		expectedTaskExecution.setTaskName(UUID.randomUUID().toString());
+		expectedTaskExecution.setParentExecutionId(12345L);
+
+		TaskExecution actualTaskExecution = this.taskRepository.startTaskExecution(expectedTaskExecution.getExecutionId(),
+				expectedTaskExecution.getTaskName(), expectedTaskExecution.getStartTime(),
+				expectedTaskExecution.getArguments(),
+				expectedTaskExecution.getExternalExecutionId(),
+				expectedTaskExecution.getParentExecutionId());
+
+		TestVerifierUtils.verifyTaskExecution(expectedTaskExecution, actualTaskExecution);
+	}
+
+	@Test
+	@DirtiesContext
 	public void testCompleteTaskExecution() {
 		TaskExecution expectedTaskExecution =
 				TaskExecutionCreator.createAndStoreTaskExecutionNoParams(taskRepository);
@@ -100,6 +198,7 @@ public class SimpleTaskRepositoryJdbcTests {
 		TaskExecution expectedTaskExecution = TaskExecutionCreator.createAndStoreTaskExecutionNoParams(taskRepository);
 		expectedTaskExecution.setExitMessage(new String(new char[SimpleTaskRepository.MAX_EXIT_MESSAGE_SIZE+1]));
 		expectedTaskExecution.setEndTime(new Date());
+		expectedTaskExecution.setExitCode(0);
 		TaskExecution actualTaskExecution = completeTaskExecution(expectedTaskExecution, taskRepository);
 		assertEquals(SimpleTaskRepository.MAX_EXIT_MESSAGE_SIZE, actualTaskExecution.getExitMessage().length());
 	}
@@ -112,6 +211,7 @@ public class SimpleTaskRepositoryJdbcTests {
 		TaskExecution expectedTaskExecution = TaskExecutionCreator.createAndStoreTaskExecutionNoParams(simpleTaskRepository);
 		expectedTaskExecution.setExitMessage(new String(new char[SimpleTaskRepository.MAX_EXIT_MESSAGE_SIZE + 1]));
 		expectedTaskExecution.setEndTime(new Date());
+		expectedTaskExecution.setExitCode(0);
 		TaskExecution actualTaskExecution = completeTaskExecution(expectedTaskExecution, simpleTaskRepository);
 		assertEquals(5, actualTaskExecution.getExitMessage().length());
 	}
@@ -122,6 +222,7 @@ public class SimpleTaskRepositoryJdbcTests {
 		TaskExecution expectedTaskExecution = TaskExecutionCreator.createAndStoreTaskExecutionNoParams(taskRepository);
 		expectedTaskExecution.setErrorMessage(new String(new char[SimpleTaskRepository.MAX_ERROR_MESSAGE_SIZE+1]));
 		expectedTaskExecution.setEndTime(new Date());
+		expectedTaskExecution.setExitCode(0);
 		TaskExecution actualTaskExecution = completeTaskExecution(expectedTaskExecution, taskRepository);
 		assertEquals(SimpleTaskRepository.MAX_ERROR_MESSAGE_SIZE, actualTaskExecution.getErrorMessage().length());
 	}
@@ -134,6 +235,7 @@ public class SimpleTaskRepositoryJdbcTests {
 		TaskExecution expectedTaskExecution = TaskExecutionCreator.createAndStoreTaskExecutionNoParams(simpleTaskRepository);
 		expectedTaskExecution.setErrorMessage(new String(new char[SimpleTaskRepository.MAX_ERROR_MESSAGE_SIZE + 1]));
 		expectedTaskExecution.setEndTime(new Date());
+		expectedTaskExecution.setExitCode(0);
 		TaskExecution actualTaskExecution = completeTaskExecution(expectedTaskExecution, simpleTaskRepository);
 		assertEquals(5, actualTaskExecution.getErrorMessage().length());
 	}
@@ -148,8 +250,7 @@ public class SimpleTaskRepositoryJdbcTests {
 				MAX_ERROR_MESSAGE_SIZE);
 		TaskExecution expectedTaskExecution = TestVerifierUtils.createSampleTaskExecutionNoArg();
 		expectedTaskExecution.setTaskName(new String(new char[MAX_TASK_NAME_SIZE + 1]));
-		simpleTaskRepository.createTaskExecution(expectedTaskExecution.getTaskName(),
-				expectedTaskExecution.getStartTime(), expectedTaskExecution.getArguments());
+		simpleTaskRepository.createTaskExecution(expectedTaskExecution);
 	}
 
 	@Test(expected = IllegalArgumentException.class)
@@ -158,8 +259,7 @@ public class SimpleTaskRepositoryJdbcTests {
 				new TaskExecutionDaoFactoryBean(this.dataSource), null, null, null);
 		TaskExecution expectedTaskExecution = TestVerifierUtils.createSampleTaskExecutionNoArg();
 		expectedTaskExecution.setTaskName(new String(new char[SimpleTaskRepository.MAX_TASK_NAME_SIZE + 1]));
-		simpleTaskRepository.createTaskExecution(expectedTaskExecution.getTaskName(),
-				expectedTaskExecution.getStartTime(), expectedTaskExecution.getArguments());
+		simpleTaskRepository.createTaskExecution(expectedTaskExecution);
 	}
 
 	@Test
@@ -183,9 +283,11 @@ public class SimpleTaskRepositoryJdbcTests {
 	@Test(expected=IllegalArgumentException.class)
 	@DirtiesContext
 	public void testCreateTaskExecutionNoParamMaxTaskName(){
-		taskRepository.createTaskExecution(
-				new String(new char[SimpleTaskRepository.MAX_TASK_NAME_SIZE+1]),
-				new Date(), null);
+		TaskExecution taskExecution = new TaskExecution();
+		taskExecution.setTaskName(
+				new String(new char[SimpleTaskRepository.MAX_TASK_NAME_SIZE+1]));
+		taskExecution.setStartTime(new Date());
+		taskRepository.createTaskExecution(taskExecution);
 	}
 
 	@Test(expected=IllegalArgumentException.class)
@@ -199,7 +301,6 @@ public class SimpleTaskRepositoryJdbcTests {
 		TaskExecution actualTaskExecution = TaskExecutionCreator.completeExecution(taskRepository, expectedTaskExecution);
 		TestVerifierUtils.verifyTaskExecution(expectedTaskExecution, actualTaskExecution);
 	}
-
 
 	@Test(expected=IllegalArgumentException.class)
 	@DirtiesContext
@@ -222,6 +323,7 @@ public class SimpleTaskRepositoryJdbcTests {
 		expectedTaskExecution.setErrorMessage(new String(new char[maxErrorMessage+ 1]));
 		expectedTaskExecution.setExitMessage(new String(new char[maxExitMessage + 1]));
 		expectedTaskExecution.setEndTime(new Date());
+		expectedTaskExecution.setExitCode(0);
 
 		TaskExecution actualTaskExecution = completeTaskExecution(expectedTaskExecution, taskRepository);
 		assertEquals(maxErrorMessage.intValue(), actualTaskExecution.getErrorMessage().length());

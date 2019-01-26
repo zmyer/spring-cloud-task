@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,9 @@ import org.springframework.data.domain.Pageable;
  * Data Access Object for task executions.
  *
  * @author Glenn Renfro
+ * @author Gunnar Hillert
+ * @author David Turanski
+ *
  */
 public interface TaskExecutionDao {
 
@@ -37,13 +40,59 @@ public interface TaskExecutionDao {
 	 * @param taskName the name that associated with the task execution.
 	 * @param startTime the time task began.
 	 * @param arguments list of key/value pairs that configure the task.
+	 * @param externalExecutionId id assigned to the task by the platform
 	 * @return A fully qualified {@link TaskExecution} instance.
 	 */
 	TaskExecution createTaskExecution( String taskName,
-						   Date startTime, List<String> arguments);
+						   Date startTime, List<String> arguments, String externalExecutionId);
 
 	/**
-	 * Update and existing {@link TaskExecution}.
+	 * Save a new {@link TaskExecution}.
+	 *
+	 * @param taskName the name that associated with the task execution.
+	 * @param startTime the time task began.
+	 * @param arguments list of key/value pairs that configure the task.
+	 * @param externalExecutionId id assigned to the task by the platform
+	 * @param parentExecutionId the parent task execution id.
+	 * @return A fully qualified {@link TaskExecution} instance.
+	 * @since 1.2.0
+	 */
+	TaskExecution createTaskExecution( String taskName,
+			Date startTime, List<String> arguments, String externalExecutionId,
+			Long parentExecutionId);
+
+	/**
+	 * Update and existing {@link TaskExecution} to mark it as started.
+	 *
+	 * @param executionId the id of  the taskExecution to be updated.
+	 * @param taskName the name that associated with the task execution.
+	 * @param startTime the time task began.
+	 * @param arguments list of key/value pairs that configure the task.
+	 * @param externalExecutionId id assigned to the task by the platform
+	 * @return A TaskExecution containing the information available at task execution start.
+	 * @since 1.1.0
+	 */
+	TaskExecution startTaskExecution(long executionId, String taskName,
+						   Date startTime, List<String> arguments, String externalExecutionId);
+
+	/**
+	 * Update and existing {@link TaskExecution} to mark it as started.
+	 *
+	 * @param executionId the id of  the taskExecution to be updated.
+	 * @param taskName the name that associated with the task execution.
+	 * @param startTime the time task began.
+	 * @param arguments list of key/value pairs that configure the task.
+	 * @param externalExecutionId id assigned to the task by the platform
+	 * @param parentExecutionId the parent task execution id.
+	 * @return A TaskExecution containing the information available at task execution start.
+	 * @since 1.2.0
+	 */
+	TaskExecution startTaskExecution(long executionId, String taskName,
+			Date startTime, List<String> arguments, String externalExecutionId,
+			Long parentExecutionId);
+
+	/**
+	 * Update and existing {@link TaskExecution} to mark it as completed.
 	 *
 	 * @param executionId the id of  the taskExecution to be updated.
 	 * @param exitCode the status of the task upon completion.
@@ -88,6 +137,14 @@ public interface TaskExecutionDao {
 	 * @return current number of task executions for the taskName.
 	 */
 	long getRunningTaskExecutionCountByTaskName(String taskName);
+
+	/**
+	 * Retrieves current number of task executions with an endTime of null.
+	 *
+	 * @return current number of task executions.
+	 */
+	long getRunningTaskExecutionCount();
+
 
 	/**
 	 * Retrieves current number of task executions.
@@ -149,4 +206,41 @@ public interface TaskExecutionDao {
 	 * @return a <code>Set</code> of the ids of the job executions executed within the task.
 	 */
 	Set<Long> getJobExecutionIdsByTaskExecutionId(long taskExecutionId);
+
+	/**
+	 * Updates the externalExecutionId for the execution id specified.
+	 * @param taskExecutionId the execution id for the task to be updated.
+	 * @param externalExecutionId the new externalExecutionId.
+	 */
+	void updateExternalExecutionId(long taskExecutionId,
+			String externalExecutionId);
+
+	/**
+	 * Returns a {@link List} of the latest {@link TaskExecution} for 1 or more task names.
+	 *
+	 * Latest is defined by the most recent start time. A {@link TaskExecution} does not have to be finished
+	 * (The results may including pending {@link TaskExecution}s).
+	 *
+	 * It is theoretically possible that a {@link TaskExecution} with the same name to have more than 1
+	 * {@link TaskExecution} for the exact same start time. In that case the {@link TaskExecution} with the
+	 * highest Task Execution ID is returned.
+	 *
+	 * This method will not consider end times in its calculations. Thus, when a task execution {@code A} starts
+	 * after task execution {@code B} but finishes BEFORE task execution {@code A}, then task execution {@code B}
+	 * is being returned.
+	 *
+	 * @param taskNames At least 1 task name must be provided
+	 * @return List of TaskExecutions. May be empty but never null.
+	 */
+	List<TaskExecution> getLatestTaskExecutionsByTaskNames(String... taskNames);
+
+	/**
+	 * Returns the latest task execution for a given task name. Will ultimately apply the same algorithm underneath
+	 * as {@link #getLatestTaskExecutionsByTaskNames(String...)} but will only return a single result.
+	 *
+	 * @param taskName Must not be null or empty
+	 * @return The latest Task Execution or null
+	 * @see #getLatestTaskExecutionsByTaskNames(String...)
+	 */
+	TaskExecution getLatestTaskExecutionForTaskName(String taskName);
 }

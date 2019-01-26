@@ -20,8 +20,10 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 import org.springframework.batch.core.ItemReadListener;
+import org.springframework.batch.item.ItemReader;
 import org.springframework.cloud.task.batch.listener.support.BatchJobHeaders;
 import org.springframework.cloud.task.batch.listener.support.MessagePublisher;
+import org.springframework.core.Ordered;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.util.Assert;
 
@@ -31,19 +33,26 @@ import org.springframework.util.Assert;
  *  The {@link ItemReadListener#beforeRead()} and
  *  {@link ItemReadListener#afterRead(Object)} are both no-ops in this implementation.
  *  {@link ItemReadListener#onReadError(Exception)} provides the exception
- * via the {@link BatchJobHeaders.BATCH_EXCEPTION} message header.
+ * via the {@link BatchJobHeaders#BATCH_EXCEPTION} message header.
  *
  * @author Glenn Renfro
+ * @author Ali Shahbour
  */
-public class EventEmittingItemReadListener implements ItemReadListener {
+public class EventEmittingItemReadListener implements ItemReadListener, Ordered {
 
 	private static final Log logger = LogFactory.getLog(EventEmittingItemReadListener.class);
 
 	private MessagePublisher<String> messagePublisher;
+	private int order = Ordered.LOWEST_PRECEDENCE;
 
 	public EventEmittingItemReadListener(MessageChannel output) {
 		Assert.notNull(output, "An output channel is required");
 		this.messagePublisher = new MessagePublisher(output);
+	}
+
+	public EventEmittingItemReadListener(MessageChannel output, int order) {
+		this(output);
+		this.order = order;
 	}
 
 	@Override
@@ -63,5 +72,10 @@ public class EventEmittingItemReadListener implements ItemReadListener {
 		}
 
 		messagePublisher.publishWithThrowableHeader("Exception while item was being read", ex.getMessage());
+	}
+
+	@Override
+	public int getOrder() {
+		return this.order;
 	}
 }

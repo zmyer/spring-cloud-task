@@ -4,37 +4,40 @@
 
 [[partintro]]
 --
-This section goes into more detail about Spring Cloud Task's integrations with Spring
-Batch.  Tracking the association between a job execution and the task it was executed
-within as well as remote partitioning via Spring Cloud Deployer are all covered within
+This section goes into more detail about Spring Cloud Task's integration with Spring
+Batch. Tracking the association between a job execution and the task in which it was
+executed as well as remote partitioning through Spring Cloud Deployer are covered in
 this section.
 --
 
 [[batch-association]]
-== Associating A Job Execution To The Task In Which It Was Executed
+== Associating a Job Execution to the Task in which It Was Executed
 
-Spring Boot provides facilities for the execution of batch jobs easily within an über-jar.
-Spring Boot's support of this functionality allows for a developer to execute multiple
-batch jobs within that execution.  Spring Cloud Task provides the ability to associate the
-execution of a job (a job execution) with a task's execution so that one can be traced
-back to the other.
+Spring Boot provides facilities for the execution of batch jobs within an über-jar.
+Spring Boot's support of this functionality lets a developer execute multiple batch jobs
+within that execution. Spring Cloud Task provides the ability to associate the execution
+of a job (a job execution) with a task's execution so that one can be traced back to the
+other.
 
-This functionality is accomplished by using the `TaskBatchExecutionListener`.  By default,
-this listener is auto configured in any context that has both a Spring Batch Job configured
-(via having a bean of type `Job` defined in the context) and the spring-cloud-task-batch jar
-is available within the classpath.  The listener will be injected into all jobs.
+Spring Cloud Task achieves this functionality by using the `TaskBatchExecutionListener`.
+By default,
+this listener is auto configured in any context that has both a Spring Batch Job
+configured (by having a bean of type `Job` defined in the context) and the
+`spring-cloud-task-batch` jar on the classpath. The listener is injected into all jobs
+that meet those conditions.
 
 [[batch-association-override]]
 === Overriding the TaskBatchExecutionListener
 
-To prevent the listener from being injected into any batch jobs within the current context,
-the autoconfiguration can be disabled via standard Spring Boot mechanisms.
+To prevent the listener from being injected into any batch jobs within the current
+context, you can disable the autoconfiguration by using standard Spring Boot mechanisms.
 
-To only have the listener injected into particular jobs within the context, the
-`batchTaskExecutionListenerBeanPostProcessor` may be overridden and a list of job bean ids
-can be provided:
+To only have the listener injected into particular jobs within the context, override the
+`batchTaskExecutionListenerBeanPostProcessor` and provide a list of job bean IDs, as shown
+in the following example:
 
-```
+[source,java]
+----
 public TaskBatchExecutionListenerBeanPostProcessor batchTaskExecutionListenerBeanPostProcessor() {
 	TaskBatchExecutionListenerBeanPostProcessor postProcessor =
 		new TaskBatchExecutionListenerBeanPostProcessor();
@@ -43,25 +46,31 @@ public TaskBatchExecutionListenerBeanPostProcessor batchTaskExecutionListenerBea
 
 	return postProcessor;
 }
-```
+----
+
+NOTE: You can find a sample batch application in the samples module of the Spring Cloud
+Task Project,
+https://github.com/spring-cloud/spring-cloud-task/tree/master/spring-cloud-task-samples/batch-job[here].
+
 
 [[batch-partitioning]]
 == Remote Partitioning
 
-Spring Cloud Deployer provides facilities for launching Spring Boot based applications on
-most cloud infrastructures.  The `DeployerPartitionHandler` and
+Spring Cloud Deployer provides facilities for launching Spring Boot-based applications on
+most cloud infrastructures. The `DeployerPartitionHandler` and
 `DeployerStepExecutionHandler` delegate the launching of worker step executions to Spring
 Cloud Deployer.
 
-To configure the `DeployerStepExecutionHandler`, a `Resource` representing the Spring Boot
-über-jar to be executed, a `TaskLauncher`, and a `JobExplorer` are all required.  You can
-configure any environment properties as well as the max number of workers to be executing
-at once, the interval to poll for the results (defaults to 10 seconds), and a timeout
-(defaults to -1 or no timeout).  An example of configuring this `PartitionHandler` would
-look like the following:
+To configure the `DeployerStepExecutionHandler`, you must provide a `Resource`
+representing the Spring Boot über-jar to be executed, a `TaskLauncher`, and a
+`JobExplorer`. You can configure any environment properties as well as the max number of
+workers to be executing at once, the interval to poll for the results (defaults to 10
+seconds), and a timeout (defaults to -1 or no timeout). The following example shows how
+configuring this `PartitionHandler` might look:
 
-```
 
+[source,java]
+----
 @Bean
 public PartitionHandler partitionHandler(TaskLauncher taskLauncher,
 		JobExplorer jobExplorer) throws Exception {
@@ -74,7 +83,7 @@ public PartitionHandler partitionHandler(TaskLauncher taskLauncher,
 		MavenResource.parse(String.format("%s:%s:%s",
 				"io.spring.cloud",
 				"partitioned-batch-job",
-				"1.1.0.M1"), mavenProperties);
+				"1.1.0.RELEASE"), mavenProperties);
 
 	DeployerPartitionHandler partitionHandler =
 		new DeployerPartitionHandler(taskLauncher, jobExplorer, resource, "workerStep");
@@ -84,25 +93,31 @@ public PartitionHandler partitionHandler(TaskLauncher taskLauncher,
 	commandLineArgs.add("--spring.cloud.task.initialize.enable=false");
 	commandLineArgs.add("--spring.batch.initializer.enabled=false");
 
-	partitionHandler.setCommandLineArgsProvider(new PassThroughCommandLineArgsProvider(commandLineArgs));
+	partitionHandler.setCommandLineArgsProvider(
+		new PassThroughCommandLineArgsProvider(commandLineArgs));
 	partitionHandler.setEnvironmentVariablesProvider(new NoOpEnvironmentVariablesProvider());
 	partitionHandler.setMaxWorkers(2);
 	partitionHandler.setApplicationName("PartitionedBatchJobTask");
 
 	return partitionHandler;
 }
-```
+----
+
+NOTE: When passing environment variables to partitions, each partition may
+be on a different machine with different environment settings.
+Consequently, you should pass only those environment variables that are required.
 
 The `Resource` to be executed is expected to be a Spring Boot über-jar with a
 `DeployerStepExecutionHandler` configured as a `CommandLineRunner` in the current context.
-The repository enumerated in the example above should be the location of the remote repository
-from which the über-jar is located. Both the master and slave are expected to have
-visibility into the same data store being used as the job repository and task repository.
-Once the underlying infrastructure has bootstrapped the Spring Boot jar and Spring Boot
-has launched the `DeployerStepExecutionHandler`, the step handler will execute the Step
-requested.  An example of configuring the `DefaultStepExecutionHandler` is show below:
+The repository enumerated in the preceding example should be the remote repository in
+which the über-jar is located. Both the master and slave are expected to have visibility
+into the same data store being used as the job repository and task repository. Once the
+underlying infrastructure has bootstrapped the Spring Boot jar and Spring Boot has
+launched the `DeployerStepExecutionHandler`, the step handler executes the requested
+`Step`. The following example shows how to configure the `DefaultStepExecutionHandler`:
 
-```
+[source,java]
+----
 @Bean
 public DeployerStepExecutionHandler stepExecutionHandler(JobExplorer jobExplorer) {
 	DeployerStepExecutionHandler handler =
@@ -110,50 +125,108 @@ public DeployerStepExecutionHandler stepExecutionHandler(JobExplorer jobExplorer
 
 	return handler;
 }
-```
+----
 
-=== Notes on developing a batch partitioned app for the Yarn platform
+NOTE: You can find a sample remote partition application in the samples module of the
+Spring Cloud Task project,
+https://github.com/spring-cloud/spring-cloud-task/tree/master/spring-cloud-task-samples/partitioned-batch-job[here].
 
-* When deploying partitioned apps on the Yarn platform be sure use the following dependency for the
-Spring Cloud Yarn Deployer (with a version 1.0.2 or higher):
-```
-		<dependency>
-			<groupId>org.springframework.cloud</groupId>
-			<artifactId>spring-cloud-starter-deployer-yarn</artifactId>
-		</dependency>
-```
-* Add the following dependency to the dependency management for a transient dependency required by Yarn:
-```
-	<dependencyManagement>
-		<dependencies>
-...
-			<dependency>
-				<groupId>com.google.guava</groupId>
-				<artifactId>guava</artifactId>
-				<version>18.0</version>
-			</dependency>
-		</dependencies>
-...
-	</dependencyManagement>
-```
-* Also add the following property to your application.properties: `spring.yarn.container.keepContextAlive=false`.
-* When setting up environment variables for the partitions in the PartitionHandler it is recommended that you do not
-copy the current working environment properties.
+=== Notes on Developing a Batch-partitioned application for the Kubernetes Platform
+
+* When deploying partitioned apps on the Kubernetes platform, you must use the following
+dependency for the Spring Cloud Kubernetes Deployer:
++
+[source,xml]
+----
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-deployer-kubernetes</artifactId>
+</dependency>
+----
+* The application name for the task application and its partitions need to follow
+the following regex pattern: `[a-z0-9]([-a-z0-9]*[a-z0-9])`.
+Otherwise, an exception is thrown.
+
+=== Notes on Developing a Batch-partitioned Application for the Cloud Foundry Platform
+
+* When deploying partitioned apps on the Cloud Foundry platform, you must use the
+following dependencies for the Spring Cloud Foundry Deployer:
++
+[source,xml]
+----
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-deployer-cloudfoundry</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.projectreactor</groupId>
+    <artifactId>reactor-core</artifactId>
+    <version>3.1.5.RELEASE</version>
+</dependency>
+<dependency>
+    <groupId>io.projectreactor.ipc</groupId>
+    <artifactId>reactor-netty</artifactId>
+    <version>0.7.5.RELEASE</version>
+</dependency>
+----
+* When configuring the partition handler, Cloud Foundry Deployment
+environment variables need to be established so that the partition handler
+can start the partitions. The following list shows the required environment
+variables:
+- `spring_cloud_deployer_cloudfoundry_url`
+- `spring_cloud_deployer_cloudfoundry_org`
+- `spring_cloud_deployer_cloudfoundry_space`
+- `spring_cloud_deployer_cloudfoundry_domain`
+- `spring_cloud_deployer_cloudfoundry_username`
+- `spring_cloud_deployer_cloudfoundry_password`
+- `spring_cloud_deployer_cloudfoundry_services`
+- `spring_cloud_deployer_cloudfoundry_taskTimeout`
+
+An example set of deployment environment variables for a partitioned task that
+uses a `mysql` database service might resemble the following:
+
+[source,bash]
+----
+spring_cloud_deployer_cloudfoundry_url=https://api.local.pcfdev.io
+spring_cloud_deployer_cloudfoundry_org=pcfdev-org
+spring_cloud_deployer_cloudfoundry_space=pcfdev-space
+spring_cloud_deployer_cloudfoundry_domain=local.pcfdev.io
+spring_cloud_deployer_cloudfoundry_username=admin
+spring_cloud_deployer_cloudfoundry_password=admin
+spring_cloud_deployer_cloudfoundry_services=mysql
+spring_cloud_deployer_cloudfoundry_taskTimeout=300
+----
+
+NOTE: When using PCF-Dev, the following environment variable is also required:
+`spring_cloud_deployer_cloudfoundry_skipSslValidation=true`
 
 [[batch-informational-messages]]
 == Batch Informational Messages
 
-Spring Cloud Task provides the ability for batch jobs to emit informational messages.  This
-is covered in detail in the section
-<<stream.adoc#stream-integration-batch-events, Spring Batch Events>>.
+Spring Cloud Task provides the ability for batch jobs to emit informational messages. The
+"`<<stream.adoc#stream-integration-batch-events>>`" section covers this feature in detail.
 
 [[batch-failures-and-tasks]]
 == Batch Job Exit Codes
 
-As discussed before Spring Cloud Task applications support the ability to record the exit code of a task execution.
-However in cases where a user is running a Spring Batch Job within a task, regardless of how the Batch Job
-Execution completes the result of the task will always be zero when using default Batch/Boot behavior.  Keep in mind
-that a task is a boot application and the exit code returned from the task is the same as a boot application.  So
-to have your task return the exit code based on the result of the batch job execution, you will need to write your
-own CommandLineRunner.
+As discussed <<features.adoc#features-lifecycle-exit-codes,earlier>>, Spring Cloud Task
+applications support the ability to record the exit code of a task execution. However, in
+cases where you run a Spring Batch Job within a task, regardless of how the Batch Job
+Execution completes, the result of the task is always zero when using the default
+Batch/Boot behavior. Keep in mind that a task is a boot application and that the exit code
+returned from the task is the same as a boot application.
+To override this behavior and allow the task to return an exit code other than zero when a
+batch job returns an
+https://docs.spring.io/spring-batch/4.0.x/reference/html/step.html#batchStatusVsExitStatus[BatchStatus]
+of `FAILED`, set `spring.cloud.task.batch.fail-on-job-failure` to `true`. Then the exit code
+can be 1 (the default) or be based on the
+https://docs.spring.io/spring-boot/docs/current/reference/html/boot-features-spring-application.html#boot-features-application-exit[specified
+`ExitCodeGenerator`])
 
+This functionality uses a new `CommandLineRunner` that replaces the one provided by Spring
+Boot. By default, it is configured with the same order. However, if you want to customize
+the order in which the `CommandLineRunner` is run, you can set its order by setting the
+`spring.cloud.task.batch.commandLineRunnerOrder` property. To have your task return the
+exit code based on the result of the batch job execution, you need to write your own
+`CommandLineRunner`.
+//TODO Great place for a example showing how a custom CommandLineRunner

@@ -28,14 +28,16 @@ import org.junit.ClassRule;
 import org.junit.Test;
 
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.autoconfigure.context.PropertyPlaceholderAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.cloud.stream.annotation.EnableBinding;
 import org.springframework.cloud.stream.annotation.StreamListener;
+import org.springframework.cloud.stream.binder.test.junit.rabbit.RabbitTestSupport;
 import org.springframework.cloud.stream.messaging.Sink;
-import org.springframework.cloud.stream.test.junit.rabbit.RabbitTestSupport;
 import org.springframework.cloud.task.batch.listener.BatchEventAutoConfiguration;
 import org.springframework.cloud.task.batch.listener.support.JobExecutionEvent;
 import org.springframework.cloud.task.batch.listener.support.StepExecutionEvent;
+import org.springframework.cloud.task.configuration.EnableTask;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.PropertySource;
 
@@ -156,6 +158,7 @@ public class BatchExecutionEventTests {
 	@EnableBinding(Sink.class)
 	@PropertySource("classpath:/org/springframework/cloud/task/listener/job-execution-sink-channel.properties")
 	@EnableAutoConfiguration
+	@EnableTask
 	public static class ListenerBinding {
 
 		@StreamListener(Sink.INPUT)
@@ -168,6 +171,7 @@ public class BatchExecutionEventTests {
 	@EnableBinding(Sink.class)
 	@PropertySource("classpath:/org/springframework/cloud/task/listener/step-execution-sink-channel.properties")
 	@EnableAutoConfiguration
+	@EnableTask
 	public static class StepListenerBinding {
 
 		@StreamListener(Sink.INPUT)
@@ -186,10 +190,11 @@ public class BatchExecutionEventTests {
 	@EnableBinding(Sink.class)
 	@PropertySource("classpath:/org/springframework/cloud/task/listener/item-process-sink-channel.properties")
 	@EnableAutoConfiguration
+	@EnableTask
 	public static class ItemProcessListenerBinding {
 
 		@StreamListener(Sink.INPUT)
-		public void receive(Object object) {
+		public void receive(String object) {
 			itemProcessLatch.countDown();
 		}
 	}
@@ -197,10 +202,11 @@ public class BatchExecutionEventTests {
 	@EnableBinding(Sink.class)
 	@PropertySource("classpath:/org/springframework/cloud/task/listener/chunk-events-sink-channel.properties")
 	@EnableAutoConfiguration
+	@EnableTask
 	public static class ChunkEventsListenerBinding {
 
 		@StreamListener(Sink.INPUT)
-		public void receive(Object chunkContext) {
+		public void receive(String message) {
 			chunkEventsLatch.countDown();
 		}
 	}
@@ -208,6 +214,7 @@ public class BatchExecutionEventTests {
 	@EnableBinding(Sink.class)
 	@PropertySource("classpath:/org/springframework/cloud/task/listener/item-read-events-sink-channel.properties")
 	@EnableAutoConfiguration
+	@EnableTask
 	public static class ItemReadEventsListenerBinding {
 
 		@StreamListener(Sink.INPUT)
@@ -219,11 +226,12 @@ public class BatchExecutionEventTests {
 	@EnableBinding(Sink.class)
 	@PropertySource("classpath:/org/springframework/cloud/task/listener/skip-events-sink-channel.properties")
 	@EnableAutoConfiguration
+	@EnableTask
 	public static class SkipEventsListenerBinding {
 		private static final String SKIPPING_READ_MESSAGE = "Skipped when reading.";
 		private static final String SKIPPING_WRITE_CONTENT = "-1";
 		@StreamListener(Sink.INPUT)
-		public void receive(Object exceptionMessage) {
+		public void receive(String exceptionMessage) {
 			if(exceptionMessage.toString().equals(SKIPPING_READ_MESSAGE)){
 				readSkipCount++;
 			}
@@ -237,24 +245,25 @@ public class BatchExecutionEventTests {
 	@EnableBinding(Sink.class)
 	@PropertySource("classpath:/org/springframework/cloud/task/listener/item-write-events-sink-channel.properties")
 	@EnableAutoConfiguration
+	@EnableTask
 	public static class ItemWriteEventsListenerBinding {
 
 		@StreamListener(Sink.INPUT)
-		public void receive(Object itemWrite) {
+		public void receive(String itemWrite) {
 			assertTrue("Message should start with '3 items'", itemWrite.toString().startsWith("3 items "));
 			assertTrue("Message should end with ' written.'", itemWrite.toString().endsWith(" written."));
 			itemWriteEventsLatch.countDown();
 		}
 	}
 
-	private Object[] getConfigurations(Class sinkClazz, Class jobConfigurationClazz) {
-		return new Object[]{
+	private Class[] getConfigurations(Class sinkClazz, Class jobConfigurationClazz) {
+		return new Class[]{PropertyPlaceholderAutoConfiguration.class,
 				jobConfigurationClazz,
 				sinkClazz };
 	}
 
 	private String[] getCommandLineParams(String sinkChannelParam) {
-		return new String[]{ "--spring.cloud.task.closecontext.enable=false",
+		return new String[]{ "--spring.cloud.task.closecontext_enable=false",
 				"--spring.cloud.task.name=" + TASK_NAME,
 				"--spring.main.web-environment=false",
 				"--spring.cloud.stream.defaultBinder=rabbit",

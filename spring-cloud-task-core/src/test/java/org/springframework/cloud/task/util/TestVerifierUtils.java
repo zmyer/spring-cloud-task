@@ -1,5 +1,5 @@
 /*
- * Copyright 2015 the original author or authors.
+ * Copyright 2015-2017 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -89,8 +89,8 @@ public class TestVerifierUtils {
 		long executionId = randomGenerator.nextLong();
 		String taskName = UUID.randomUUID().toString();
 
-		return new TaskExecution(executionId, 0, taskName,
-				startTime, null, null, new ArrayList<String>(), null);
+		return new TaskExecution(executionId, null, taskName,
+				startTime, null, null, new ArrayList<String>(), null, null);
 	}
 
 	/**
@@ -108,7 +108,7 @@ public class TestVerifierUtils {
 		String exitMessage = UUID.randomUUID().toString();
 
 		return new TaskExecution(executionId, exitCode, taskName,
-				startTime, endTime, exitMessage, new ArrayList<String>(), null);
+				startTime, endTime, exitMessage, new ArrayList<String>(), null, null);
 	}
 
 	/**
@@ -119,12 +119,13 @@ public class TestVerifierUtils {
 	public static TaskExecution createSampleTaskExecution(long executionId) {
 		Date startTime = new Date();
 		String taskName = UUID.randomUUID().toString();
+		String externalExecutionId = UUID.randomUUID().toString();
 		List<String> args = new ArrayList<>(ARG_SIZE);
 		for (int i = 0; i < ARG_SIZE; i++){
 			args.add(UUID.randomUUID().toString());
 		}
 		return new TaskExecution(executionId, null, taskName,
-				startTime, null, null, args, null);
+				startTime, null, null, args, null, externalExecutionId);
 	}
 
 	/**
@@ -155,6 +156,13 @@ public class TestVerifierUtils {
 		assertEquals("errorMessage must be equal",
 				expectedTaskExecution.getErrorMessage(),
 				actualTaskExecution.getErrorMessage());
+		assertEquals("externalExecutionId must be equal",
+				expectedTaskExecution.getExternalExecutionId(),
+				actualTaskExecution.getExternalExecutionId());
+		assertEquals("parentExecutionId must be equal",
+				expectedTaskExecution.getParentExecutionId(),
+				actualTaskExecution.getParentExecutionId());
+
 		if (expectedTaskExecution.getArguments() != null) {
 			assertNotNull("arguments should not be null",
 					actualTaskExecution.getArguments());

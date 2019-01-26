@@ -16,26 +16,25 @@
 
 package io.spring;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.SpringApplicationConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.cloud.stream.annotation.Bindings;
 import org.springframework.cloud.stream.messaging.Processor;
 import org.springframework.cloud.stream.test.binder.MessageCollector;
 import org.springframework.cloud.task.launcher.TaskLaunchRequest;
+import org.springframework.messaging.Message;
 import org.springframework.messaging.support.GenericMessage;
-import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.test.context.junit4.SpringRunner;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
-import static org.springframework.cloud.stream.test.matcher.MessageQueueMatcher.receivesPayloadThat;
 
 /**
  * @author Glenn Renfro
@@ -47,20 +46,25 @@ public class TaskProcessorApplicationTests {
 	private static final String DEFAULT_PAYLOAD = "hello";
 
 	@Autowired
-	@Bindings(TaskProcessor.class)
 	protected Processor channels;
 
 	@Autowired
 	protected MessageCollector collector;
 
+	private ObjectMapper mapper = new ObjectMapper();
+
 		@Test
-		public void test() throws InterruptedException{
+		public void test() throws InterruptedException, IOException {
 			channels.input().send(new GenericMessage<Object>(DEFAULT_PAYLOAD));
 			Map<String, String> properties = new HashMap();
 			properties.put("payload", DEFAULT_PAYLOAD);
-			TaskLaunchRequest expectedRequest = new TaskLaunchRequest("maven://org.springframework.cloud.task.app:"
-					+ "timestamp-task:jar:1.0.1.RELEASE", null, properties, null);
-			assertThat(collector.forChannel(channels.output()), receivesPayloadThat(is(expectedRequest)));
+			TaskLaunchRequest expectedRequest = new TaskLaunchRequest(
+					"maven://org.springframework.cloud.task.app:"
+					+ "timestamp-task:jar:1.0.1.RELEASE", null, properties,
+					null, null);
+			Message<String> result = (Message<String>)collector.forChannel(channels.output()).take();
+			TaskLaunchRequest tlq = mapper.readValue(result.getPayload(),TaskLaunchRequest.class);
+			assertThat(tlq, is(expectedRequest));
 		}
 
 }

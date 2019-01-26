@@ -16,9 +16,6 @@
 
 package org.springframework.cloud.task.batch.listener.support;
 
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -232,6 +229,7 @@ public class StepExecutionEvent extends Entity {
 
 	/**
 	 * Setter for number of rollbacks for this execution
+	 * @param rollbackCount the number of rollbacks for this execution
 	 */
 	public void setRollbackCount(int rollbackCount) {
 		this.rollbackCount = rollbackCount;
@@ -284,7 +282,7 @@ public class StepExecutionEvent extends Entity {
 	}
 
 	/**
-	 * @param exitStatus
+	 * @param exitStatus the {@link ExitStatus} for the step.
 	 */
 	public void setExitStatus(ExitStatus exitStatus) {
 		this.exitStatus = exitStatus;
@@ -343,7 +341,7 @@ public class StepExecutionEvent extends Entity {
 	/**
 	 * Set the number of records skipped on read
 	 *
-	 * @param readSkipCount
+	 * @param readSkipCount the number of records to be skipped on read.
 	 */
 	public void setReadSkipCount(int readSkipCount) {
 		this.readSkipCount = readSkipCount;
@@ -352,7 +350,7 @@ public class StepExecutionEvent extends Entity {
 	/**
 	 * Set the number of records skipped on write
 	 *
-	 * @param writeSkipCount
+	 * @param writeSkipCount the number of records to be skipped on write.
 	 */
 	public void setWriteSkipCount(int writeSkipCount) {
 		this.writeSkipCount = writeSkipCount;
@@ -368,7 +366,7 @@ public class StepExecutionEvent extends Entity {
 	/**
 	 * Set the number of records skipped during processing.
 	 *
-	 * @param processSkipCount
+	 * @param processSkipCount the number of records skip during processing.
 	 */
 	public void setProcessSkipCount(int processSkipCount) {
 		this.processSkipCount = processSkipCount;
@@ -384,7 +382,7 @@ public class StepExecutionEvent extends Entity {
 	/**
 	 * Set the time when the StepExecution was last updated before persisting
 	 *
-	 * @param lastUpdated
+	 * @param lastUpdated the {@link Date} the StepExecution was last updated.
 	 */
 	public void setLastUpdated(Date lastUpdated) {
 		this.lastUpdated = lastUpdated;
@@ -415,15 +413,6 @@ public class StepExecutionEvent extends Entity {
 
 		return this.stepName.equals(other.getStepName()) && (this.jobExecutionId == other.getJobExecutionId())
 				&& getId().equals(other.getId());
-	}
-
-	/**
-	 * Deserialize and ensure transient fields are re-instantiated when read
-	 * back
-	 */
-	private void readObject(ObjectInputStream stream) throws IOException, ClassNotFoundException {
-		stream.defaultReadObject();
-		this.failureExceptions = new ArrayList<>();
 	}
 
 	/*
